@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bot Immobilier - Agence Maroc</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); padding: 40px; }
+        #chat-widget-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; }
+        #chat-toggle-btn { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; font-size: 28px; cursor: pointer; box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4); display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+        #chat-toggle-btn:hover { transform: scale(1.05); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6); }
+        #chat-window { position: absolute; bottom: 80px; right: 0; width: 380px; height: 600px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; overflow: hidden; opacity: 0; transform: translateY(20px) scale(0.95); pointer-events: none; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #chat-window.active { opacity: 1; transform: translateY(0) scale(1); pointer-events: all; }
+        .chat-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 24px; position: relative; }
+        .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .header-info h3 { font-size: 18px; font-weight: 600; margin: 0; }
+        .status { display: flex; align-items: center; gap: 6px; font-size: 13px; opacity: 0.9; margin-top: 2px; }
+        .status-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        #chat-close-btn { position: absolute; top: 24px; right: 24px; background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        #chat-close-btn:hover { background: rgba(255,255,255,0.3); }
+        .chat-body { flex: 1; padding: 20px; overflow-y: auto; background: #f8f9fa; }
+        .welcome-message { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .welcome-message h4 { color: #667eea; font-size: 18px; margin-bottom: 12px; }
+        .welcome-message p { color: #4b5563; line-height: 1.6; margin-bottom: 16px; }
+        .quick-replies { display: flex; flex-wrap: wrap; gap: 10px; }
+        .quick-reply-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 24px; padding: 12px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); }
+        .quick-reply-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .message { max-width: 85%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.5; margin: 8px 0; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .message.bot { background: white; color: #4b5563; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .message.user { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; align-self: flex-end; border-bottom-right-radius: 4px; margin-left: auto; }
+        .typing-indicator { display: flex; gap: 4px; padding: 12px 16px; background: white; border-radius: 16px; border-bottom-left-radius: 4px; align-self: flex-start; width: fit-content; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .typing-indicator span { width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out; }
+        .typing-indicator span:nth-child(1) { animation-delay: 0s; } .typing-indicator span:nth-child(2) { animation-delay: 0.2s; } .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+        .final-wa-btn { display: inline-flex; align-items: center; gap: 8px; background: #25D366; color: white; padding: 14px 20px; border-radius: 24px; border: none; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4); transition: all 0.2s; }
+        .final-wa-btn:hover { background: #128C7E; transform: translateY(-2px); }
+        .progress-bar { height: 4px; background: rgba(102, 126, 234, 0.2); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.5s ease; width: 0%; }
+        .chat-footer { padding: 20px; background: white; border-top: 1px solid #e5e7eb; display: flex; gap: 12px; }
+        #chat-input { flex: 1; border: 2px solid #e5e7eb; border-radius: 24px; padding: 12px 20px; font-size: 14px; outline: none; transition: all 0.2s; }
+        #chat-input:focus { border-color: #667eea; }
+        #chat-input::placeholder { color: #9ca3af; }
+        #chat-send-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 24px; padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); }
+        #chat-send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .chat-body::-webkit-scrollbar { width: 6px; } .chat-body::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.3); border-radius: 3px; }
+        @media (max-width: 480px) { #chat-window { width: calc(100vw - 40px); height: calc(100vh - 120px); bottom: 80px; right: -10px; } }
+    </style>
+</head>
+<body>
+
+    <div style="max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <h1>Agence Immobilière Maroc</h1>
+        <p>Cliquez sur le bouton de chat pour trouver votre propriété idéale.</p>
+    </div>
+
+    <div id="chat-widget-container">
+        <button id="chat-toggle-btn" aria-label="Ouvrir chat">💬</button>
+
+        <div id="chat-window">
+            <div class="chat-header">
+                <div class="header-top">
+                    <div class="avatar">🏠</div>
+                    <div class="header-info">
+                        <h3>Assistant virtuel</h3>
+                        <div class="status">
+                            <span class="status-dot"></span>
+                            <span>Nous répondons généralement en quelques minutes</span>
+                        </div>
+                    </div>
+                </div>
+                <button id="chat-close-btn" aria-label="Fermer chat">×</button>
+            </div>
+            
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+
+            <div class="chat-body" id="chat-body">
+                <div class="welcome-message">
+                    <h4>Bienvenue à Agence Immobilière Maroc !</h4>
+                    <p>Je suis votre assistant virtuel. Trouvez la propriété de vos rêves au Maroc. Comment puis-je vous aider aujourd'hui ?</p>
+                    <div class="quick-replies">
+                        <button class="quick-reply-btn" onclick="startChat('Acheter')">🏠 Acheter</button>
+                        <button class="quick-reply-btn" onclick="startChat('Vendre')">💰 Vendre</button>
+                        <button class="quick-reply-btn" onclick="startChat('Louer')"> Louer</button>
+                        <button class="quick-reply-btn" onclick="startChat('Investissement')">📈 Investissement</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-footer">
+                <input type="text" id="chat-input" placeholder="Écrivez votre message..." autocomplete="off">
+                <button id="chat-send-btn">Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const toggleBtn = document.getElementById('chat-toggle-btn');
+        const closeBtn = document.getElementById('chat-close-btn');
+        const chatWindow = document.getElementById('chat-window');
+        const chatBody = document.getElementById('chat-body');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('chat-send-btn');
+        const progressFill = document.getElementById('progress-fill');
+
+        const WHATSAPP_NUMBER = '212690157092';
+        let currentState = 0;
+        let leadData = {};
+        let chatInitialized = false;
+        const TOTAL_STEPS = 12; 
+
+        function removeEmojis(text) {
+            return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+        }
+
+        toggleBtn.addEventListener('click', () => { chatWindow.classList.toggle('active'); if (chatWindow.classList.contains('active')) chatInput.focus(); });
+        closeBtn.addEventListener('click', () => chatWindow.classList.remove('active'));
+
+        function updateProgress(step) { progressFill.style.width = (step / TOTAL_STEPS) * 100 + '%'; }
+
+        function startChat(option) {
+            if (chatInitialized) return;
+            chatInitialized = true;
+            leadData.operacion = option;
+            
+            document.querySelector('.welcome-message').remove();
+            
+            addBotMessage(`Parfait ! Je vous aide avec ${option}. Commençons à chercher votre propriété idéale.`);
+            
+            setTimeout(() => {
+                currentState = 1;
+                updateProgress(1);
+                addBotMessage(`1. 📍 Dans quelle zone du Maroc êtes-vous intéressé ?`);
+                setTimeout(() => {
+                    addQuickReplies([
+                        { display: '🌊 Tanger / Nord', value: 'Tanger / Nord' },
+                        { display: '️ Tetouan', value: 'Tetouan' },
+                        { display: '️ Martil', value: 'Martil' },
+                        { display: '⛵ Mdiq', value: 'Mdiq' },
+                        { display: '🏛️ Rabat / Côte Atlantique', value: 'Rabat / Côte Atlantique' },
+                        { display: '🌆 Kenitra', value: 'Kenitra' },
+                        { display: '🏙️ Casablanca', value: 'Casablanca' },
+                        { display: '🕌 Fez', value: 'Fez' },
+                        { display: '⚓ Nador', value: 'Nador' },
+                        { display: ' Marrakech / Intérieur', value: 'Marrakech / Intérieur' },
+                        { display: '☀️ Agadir / Sud', value: 'Agadir / Sud' },
+                        { display: '📍 Autre zone', value: 'Autre zone' }
+                    ]);
+                }, 600);
+            }, 800);
+        }
+
+        function addBotMessage(html) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', 'bot');
+            msgDiv.innerHTML = html;
+            chatBody.appendChild(msgDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function addUserMessage(text) {
+            const msgDiv = document.createElement('div');
+            msgDiv.classList.add('message', 'user');
+            msgDiv.textContent = text;
+            chatBody.appendChild(msgDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function addQuickReplies(options) {
+            const repliesDiv = document.createElement('div');
+            repliesDiv.classList.add('quick-replies');
+            repliesDiv.style.marginTop = '10px';
+            
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.classList.add('quick-reply-btn');
+                btn.innerHTML = option.display;
+                btn.onclick = () => { processInput(option.value); repliesDiv.remove(); };
+                repliesDiv.appendChild(btn);
+            });
+            
+            chatBody.appendChild(repliesDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function addQuickRepliesButtons() {
+            const repliesDiv = document.createElement('div');
+            repliesDiv.classList.add('quick-replies');
+            repliesDiv.style.marginTop = '10px';
+            
+            const buttons = [
+                { display: '🏠 Acheter', value: 'Acheter' },
+                { display: '💰 Vendre', value: 'Vendre' },
+                { display: '🔑 Louer', value: 'Louer' },
+                { display: ' Investissement', value: 'Investissement' }
+            ];
+            
+            buttons.forEach(btn => {
+                const button = document.createElement('button');
+                button.classList.add('quick-reply-btn');
+                button.innerHTML = btn.display;
+                button.onclick = () => {
+                    repliesDiv.remove();
+                    startChat(btn.value);
+                };
+                repliesDiv.appendChild(button);
+            });
+            
+            chatBody.appendChild(repliesDiv);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function clearQuickReplies() { document.querySelectorAll('.quick-replies').forEach(el => el.remove()); }
+        function showTyping() { const t = document.createElement('div'); t.classList.add('typing-indicator'); t.id = 'typing'; t.innerHTML = '<span></span><span></span><span></span>'; chatBody.appendChild(t); chatBody.scrollTop = chatBody.scrollHeight; }
+        function hideTyping() { const t = document.getElementById('typing'); if (t) t.remove(); }
+
+        function processInput(text) {
+            addUserMessage(text);
+            clearQuickReplies();
+            showTyping();
+            setTimeout(() => { hideTyping(); handleState(text); }, 900);
+        }
+
+        function handleState(text) {
+            if (currentState === 0) {
+                const lowerText = text.toLowerCase();
+                if (lowerText.includes('bonjour') || lowerText.includes('salut') || lowerText.includes('hello') || lowerText.includes('hi') || lowerText.includes('bonsoir')) {
+                    addBotMessage('Bonjour ! 👋 Je suis ravi de vous accueillir. Comment puis-je vous aider aujourd\'hui ?<br><br>Veuillez choisir une option ci-dessous ou posez-moi vos questions directement :');
+                    setTimeout(() => { addQuickRepliesButtons(); }, 400);
+                    return;
+                }
+                if (lowerText.includes('prix') || lowerText.includes('coût') || lowerText.includes('combien') || lowerText.includes('tarif')) {
+                    addBotMessage('Nos prix varient selon vos besoins spécifiques. Pour vous donner les meilleures options, veuillez sélectionner l\'une des options ci-dessous :');
+                    setTimeout(() => { addQuickRepliesButtons(); }, 400);
+                    return;
+                }
+                if (lowerText.includes('service') || lowerText.includes('aide') || lowerText.includes('information') || lowerText.includes('info')) {
+                    addBotMessage('Nous offrons des services complets d\'immobilier au Maroc : achat, vente, location et conseil en investissement.<br><br>Quelle option vous intéresse ?');
+                    setTimeout(() => { addQuickRepliesButtons(); }, 400);
+                    return;
+                }
+                addBotMessage('Merci pour votre message ! Pour mieux vous aider, veuillez sélectionner l\'une des options ci-dessous :');
+                setTimeout(() => { addQuickRepliesButtons(); }, 400);
+                return;
+            }
+            
+            switch (currentState) {
+                case 1:
+                    leadData.zona = text;
+                    currentState = 2; updateProgress(2);
+                    addBotMessage(`2. 🏠 Quel type de propriété recherchez-vous ?`);
+                    setTimeout(() => {
+                        addQuickReplies([
+                            { display: '🏢 Appartement moderne', value: 'Appartement moderne' },
+                            { display: '🏡 Villa / Chalet', value: 'Villa / Chalet' },
+                            { display: '🕌 Riad traditionnel', value: 'Riad traditionnel' },
+                            { display: '🌾 Terrain', value: 'Terrain' },
+                            { display: '🏪 Local commercial', value: 'Local commercial' },
+                            { display: '🅿️ Place de parking', value: 'Place de parking' }
+                        ]);
+                    }, 600);
+                    break;
+
+                case 2:
+                    leadData.tipoPropiedad = text;
+                    const lowerType = text.toLowerCase();
+                    leadData.esTerreno = lowerType.includes('terrain');
+                    leadData.esLocalCommercial = lowerType.includes('local commercial');
+                    leadData.esParking = lowerType.includes('parking');
+                    
+                    if (leadData.esTerreno || leadData.esLocalCommercial) {
+                        // Terreno o Local commercial -> preguntar metros
+                        currentState = 3; updateProgress(3);
+                        const label = leadData.esTerreno ? 'terrain' : 'local commercial';
+                        addBotMessage(`3. 📏 Combien de mètres carrés approximativement pour ce ${label} ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: 'Moins de 50 m²', value: 'Moins de 50 m²' },
+                                { display: '50 m² - 100 m²', value: '50 m² - 100 m²' },
+                                { display: '100 m² - 200 m²', value: '100 m² - 200 m²' },
+                                { display: '200 m² - 500 m²', value: '200 m² - 500 m²' },
+                                { display: 'Plus de 500 m²', value: 'Plus de 500 m²' },
+                                { display: 'Écrire mesure', value: 'Écrire mesure' }
+                            ]);
+                        }, 600);
+                    } else if (leadData.esParking) {
+                        // Parking -> saltar directamente al plazo
+                        currentState = 6; updateProgress(6);
+                        addBotMessage(`3. ⏳ Quel est votre délai estimé ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '⚡ Immédiat (< 3 mois)', value: 'Immédiat (< 3 mois)' },
+                                { display: '📅 Court terme (3-6 mois)', value: 'Court terme (3-6 mois)' },
+                                { display: '🗓️ Long terme (> 6 mois)', value: 'Long terme (> 6 mois)' },
+                                { display: '👀 Je regarde juste', value: 'Je regarde juste' }
+                            ]);
+                        }, 600);
+                    } else {
+                        // Vivienda normal -> preguntar habitaciones
+                        currentState = 3; updateProgress(3);
+                        addBotMessage(`3. 🛏️ Combien de chambres avez-vous besoin ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '1', value: '1' }, { display: '2', value: '2' }, { display: '3', value: '3' },
+                                { display: '4', value: '4' }, { display: '5 ou plus', value: '5 ou plus' }, { display: 'Non applicable', value: 'Non applicable' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 3:
+                    currentState = 4; updateProgress(4);
+                    if (leadData.esTerreno || leadData.esLocalCommercial) {
+                        leadData.metros = text;
+                        if (leadData.esTerreno) {
+                            addBotMessage(`4. 🌲 Avez-vous besoin d'une caractéristique spéciale pour le terrain ?`);
+                            setTimeout(() => {
+                                addQuickReplies([
+                                    { display: '🏖️ Accès à la mer/rivière', value: 'Accès à la mer/rivière' },
+                                    { display: ' Entouré de nature', value: 'Entouré de nature' },
+                                    { display: '🛣️ Accès asphalté', value: 'Accès asphalté' },
+                                    { display: '✅ Toutes', value: 'Toutes' },
+                                    { display: '❌ Aucune', value: 'Aucune' }
+                                ]);
+                            }, 600);
+                        } else {
+                            // Local commercial -> saltar características y pasar al plazo
+                            currentState = 6; updateProgress(6);
+                            addBotMessage(`4. ⏳ Quel est votre délai estimé ?`);
+                            setTimeout(() => {
+                                addQuickReplies([
+                                    { display: ' Immédiat (< 3 mois)', value: 'Immédiat (< 3 mois)' },
+                                    { display: '📅 Court terme (3-6 mois)', value: 'Court terme (3-6 mois)' },
+                                    { display: '🗓️ Long terme (> 6 mois)', value: 'Long terme (> 6 mois)' },
+                                    { display: '👀 Je regarde juste', value: 'Je regarde juste' }
+                                ]);
+                            }, 600);
+                        }
+                    } else {
+                        leadData.habitaciones = text;
+                        addBotMessage(`4. 🚿 Combien de salles de bain avez-vous besoin ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '1', value: '1' }, { display: '2', value: '2' }, { display: '3', value: '3' },
+                                { display: '4 ou plus', value: '4 ou plus' }, { display: 'Non applicable', value: 'Non applicable' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 4:
+                    currentState = 5; updateProgress(5);
+                    if (leadData.esTerreno) {
+                        leadData.caracteristicas = text;
+                        addBotMessage(`5. ⏳ Quel est votre délai estimé ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '⚡ Immédiat (< 3 mois)', value: 'Immédiat (< 3 mois)' },
+                                { display: '📅 Court terme (3-6 mois)', value: 'Court terme (3-6 mois)' },
+                                { display: '🗓️ Long terme (> 6 mois)', value: 'Long terme (> 6 mois)' },
+                                { display: ' Je regarde juste', value: 'Je regarde juste' }
+                            ]);
+                        }, 600);
+                    } else {
+                        leadData.banos = text;
+                        addBotMessage(`5.  Avez-vous besoin d'une caractéristique spéciale ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '🏖️ Première ligne plage/montagne', value: 'Première ligne plage/montagne' },
+                                { display: '🌿 Terrasse ou jardin', value: 'Terrasse ou jardin' },
+                                { display: '🛋️ Meublé', value: 'Meublé' },
+                                { display: '✅ Toutes', value: 'Toutes' },
+                                { display: '❌ Aucune', value: 'Aucune' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 5:
+                    currentState = 6; updateProgress(6);
+                    if (leadData.esTerreno) {
+                        leadData.plazo = text;
+                        addBotMessage(`6. 🛠️ Avez-vous besoin d'une gestion intégrale ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✅ Oui, tout inclus', value: 'Oui, tout inclus' },
+                                { display: '🔍 Juste recherche', value: 'Juste recherche' },
+                                { display: '⚖️ Juste conseil juridique', value: 'Juste conseil juridique' },
+                                { display: '🏠 J\'ai déjà un avocat', value: 'J\'ai déjà un avocat' }
+                            ]);
+                        }, 600);
+                    } else {
+                        leadData.caracteristicas = text;
+                        addBotMessage(`6. ⏳ Quel est votre délai estimé ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '⚡ Immédiat (< 3 mois)', value: 'Immédiat (< 3 mois)' },
+                                { display: '📅 Court terme (3-6 mois)', value: 'Court terme (3-6 mois)' },
+                                { display: '🗓️ Long terme (> 6 mois)', value: 'Long terme (> 6 mois)' },
+                                { display: '👀 Je regarde juste', value: 'Je regarde juste' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 6:
+                    currentState = 7; updateProgress(7);
+                    if (leadData.esTerreno) {
+                        leadData.gestion = text;
+                        addBotMessage(`7. 🌍 Quelle est votre nationalité ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '🇪🇸 Espagne / UE', value: 'Espagne / UE' },
+                                { display: '🌎 Amérique Latine', value: 'Amérique Latine' },
+                                { display: '🇲🇦 Maroc', value: 'Maroc' },
+                                { display: '🌍 Autre pays', value: 'Autre pays' }
+                            ]);
+                        }, 600);
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.plazo = text;
+                        addBotMessage(`5. 🛠️ Avez-vous besoin d'une gestion intégrale ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✅ Oui, tout inclus', value: 'Oui, tout inclus' },
+                                { display: '🔍 Juste recherche', value: 'Juste recherche' },
+                                { display: '⚖️ Juste conseil juridique', value: 'Juste conseil juridique' },
+                                { display: '🏠 J\'ai déjà un avocat', value: 'J\'ai déjà un avocat' }
+                            ]);
+                        }, 600);
+                    } else {
+                        leadData.plazo = text;
+                        addBotMessage(`7. 🛠️ Avez-vous besoin d'une gestion intégrale ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✅ Oui, tout inclus', value: 'Oui, tout inclus' },
+                                { display: '🔍 Juste recherche', value: 'Juste recherche' },
+                                { display: '⚖️ Juste conseil juridique', value: 'Juste conseil juridique' },
+                                { display: '🏠 J\'ai déjà un avocat', value: 'J\'ai déjà un avocat' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 7:
+                    currentState = 8; updateProgress(8);
+                    if (leadData.esTerreno) {
+                        leadData.nacionalidad = text;
+                        addBotMessage(`8. 💬 Un commentaire supplémentaire ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✏️ Écrire commentaire', value: 'Écrire commentaire' },
+                                { display: '⏭️ Passer', value: 'Passer' }
+                            ]);
+                        }, 600);
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.gestion = text;
+                        addBotMessage(`6. 🌍 Quelle est votre nationalité ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '🇪🇸 Espagne / UE', value: 'Espagne / UE' },
+                                { display: '🌎 Amérique Latine', value: 'Amérique Latine' },
+                                { display: '🇦 Maroc', value: 'Maroc' },
+                                { display: '🌍 Autre pays', value: 'Autre pays' }
+                            ]);
+                        }, 600);
+                    } else {
+                        leadData.gestion = text;
+                        addBotMessage(`8. 🌍 Quelle est votre nationalité ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '🇪🇸 Espagne / UE', value: 'Espagne / UE' },
+                                { display: '🌎 Amérique Latine', value: 'Amérique Latine' },
+                                { display: '🇲🇦 Maroc', value: 'Maroc' },
+                                { display: '🌍 Autre pays', value: 'Autre pays' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 8:
+                    currentState = 9; updateProgress(9);
+                    if (leadData.esTerreno) {
+                        leadData.comentarios = text === 'Passer' ? 'Sans commentaires' : text;
+                        addBotMessage(`9. 👤 Presque terminé ! Quel est votre nom complet ?`);
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.nacionalidad = text;
+                        addBotMessage(`7. 💬 Un commentaire supplémentaire ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✏️ Écrire commentaire', value: 'Écrire commentaire' },
+                                { display: '⏭️ Passer', value: 'Passer' }
+                            ]);
+                        }, 600);
+                    } else {
+                        leadData.nacionalidad = text;
+                        addBotMessage(`9. 💬 Un commentaire supplémentaire ?`);
+                        setTimeout(() => {
+                            addQuickReplies([
+                                { display: '✏️ Écrire commentaire', value: 'Écrire commentaire' },
+                                { display: '⏭️ Passer', value: 'Passer' }
+                            ]);
+                        }, 600);
+                    }
+                    break;
+
+                case 9:
+                    currentState = 10; updateProgress(10);
+                    if (leadData.esTerreno) {
+                        leadData.nombre = text;
+                        addBotMessage(`10.  Votre numéro WhatsApp ?`);
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.comentarios = text === 'Passer' ? 'Sans commentaires' : text;
+                        addBotMessage(`8. 👤 Presque terminé ! Quel est votre nom complet ?`);
+                    } else {
+                        leadData.comentarios = text === 'Passer' ? 'Sans commentaires' : text;
+                        addBotMessage(`10. 👤 Presque terminé ! Quel est votre nom complet ?`);
+                    }
+                    break;
+
+                case 10:
+                    currentState = 11; updateProgress(11);
+                    if (leadData.esTerreno) {
+                        leadData.telefono = text;
+                        addBotMessage(`11. 📧 Enfin, votre adresse email ?`);
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.nombre = text;
+                        addBotMessage(`9. 📱 Votre numéro WhatsApp ?`);
+                    } else {
+                        leadData.nombre = text;
+                        addBotMessage(`11. 📱 Votre numéro WhatsApp ?`);
+                    }
+                    break;
+
+                case 11:
+                    currentState = 12; updateProgress(12);
+                    if (leadData.esTerreno) {
+                        leadData.email = text;
+                        showSummary();
+                    } else if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.telefono = text;
+                        addBotMessage(`10. 📧 Enfin, votre adresse email ?`);
+                        currentState = 13;
+                    } else {
+                        leadData.telefono = text;
+                        addBotMessage(`12. 📧 Enfin, votre adresse email ?`);
+                        currentState = 13;
+                    }
+                    break;
+
+                case 12:
+                    if (leadData.esLocalCommercial || leadData.esParking) {
+                        leadData.email = text;
+                        showSummary();
+                    } else {
+                        leadData.email = text;
+                        showSummary();
+                    }
+                    break;
+
+                case 13:
+                    leadData.email = text;
+                    showSummary();
+                    break;
+            }
+        }
+
+        function showSummary() {
+            addBotMessage(`Excellent, ${leadData.nombre} ! Voici votre résumé :`);
+            setTimeout(() => {
+                let summary = `<b>Opération:</b> ${leadData.operacion}<br>`;
+                summary += `<b>Zone:</b> ${leadData.zona}<br>`;
+                summary += `<b>Type:</b> ${leadData.tipoPropiedad}<br>`;
+                
+                if (leadData.esTerreno || leadData.esLocalCommercial) {
+                    summary += `<b>Mètres carrés:</b> ${leadData.metros}<br>`;
+                }
+                if (!leadData.esTerreno && !leadData.esLocalCommercial && !leadData.esParking) { 
+                    summary += `<b>Chambres:</b> ${leadData.habitaciones}<br>`; 
+                    summary += `<b>Salles de bain:</b> ${leadData.banos}<br>`; 
+                }
+                
+                summary += `<b>Caractéristiques:</b> ${leadData.caracteristicas || 'Non applicable'}<br>`;
+                summary += `<b>Délai:</b> ${leadData.plazo}<br>`;
+                summary += `<b>Gestion:</b> ${leadData.gestion}<br>`;
+                summary += `<b>Nationalité:</b> ${leadData.nacionalidad}<br>`;
+                summary += `<b>Tél:</b> ${leadData.telefono}<br>`;
+                summary += `<b>Email:</b> ${leadData.email}`;
+                
+                addBotMessage(summary);
+            }, 700);
+            
+            setTimeout(() => {
+                addBotMessage(`Cliquez ci-dessous pour envoyer par WhatsApp :`);
+                setTimeout(() => {
+                    const waBtn = document.createElement('button');
+                    waBtn.classList.add('final-wa-btn');
+                    waBtn.innerHTML = '📱 Envoyer par WhatsApp';
+                    waBtn.onclick = sendToWhatsApp;
+                    chatBody.appendChild(waBtn);
+                    chatBody.scrollTop = chatBody.scrollHeight;
+                }, 600);
+            }, 1500);
+        }
+
+        function sendToWhatsApp() {
+            const titulos = {
+                'Acheter': 'NOUVELLE DEMANDE D\'ACHAT',
+                'Vendre': 'NOUVELLE DEMANDE DE VENTE',
+                'Louer': 'NOUVELLE DEMANDE DE LOCATION',
+                'Investissement': 'NOUVELLE DEMANDE D\'INVESTISSEMENT'
+            };
+            
+            const titulo = titulos[leadData.operacion] || 'NOUVELLE DEMANDE IMMOBILIÈRE';
+
+            let propertyDetails = '';
+            if (leadData.esTerreno || leadData.esLocalCommercial) {
+                propertyDetails = `*Mètres carrés:* ${leadData.metros}`;
+            } else if (!leadData.esParking) {
+                propertyDetails = `*Chambres:* ${leadData.habitaciones}\n*Salles de bain:* ${leadData.banos}`;
+            }
+
+            const mensaje = `${titulo}
+━━━━━━━━━━━━━━━━━━━━
+
+*Opération:* ${leadData.operacion}
+*Nom:* ${leadData.nombre}
+*Téléphone:* ${leadData.telefono}
+*Email:* ${leadData.email}
+
+*Zone:* ${leadData.zona}
+*Type:* ${leadData.tipoPropiedad}
+${propertyDetails}
+*Caractéristiques:* ${leadData.caracteristicas || 'Non applicable'}
+*Délai:* ${leadData.plazo}
+*Gestion:* ${leadData.gestion}
+*Nationalité:* ${leadData.nacionalidad}
+*Commentaires:* ${leadData.comentarios || 'Sans commentaires'}
+
+━━━━━━━━━━━━━━━━━━━━
+Envoyé depuis le site web`;
+
+            const whatsappURL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(mensaje)}`;
+            window.open(whatsappURL, '_blank');
+            
+            setTimeout(() => {
+                addBotMessage('✅ Message envoyé ! Un agent vous contactera bientôt.');
+            }, 1000);
+        }
+
+        sendBtn.addEventListener('click', () => { 
+            const text = removeEmojis(chatInput.value.trim());
+            if (!text) return;
+            chatInput.value = ''; 
+            processInput(text); 
+        });
+        
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendBtn.click(); });
+    </script>
+</body>
+</html>
